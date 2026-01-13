@@ -150,9 +150,8 @@ const generarCSV = async (req, res) => {
 
         try {
             await connection.execute(`BEGIN EXPORTAR_CSV; END;`);
-            console.log("✅ Procedure PL/SQL ejecutado en Azure.");
-        } catch (plsqlError) {
-            console.warn("⚠️ Alerta PL/SQL:", plsqlError.message);
+        } catch (e) {
+            console.log("Aviso: El procedure PL/SQL no generó archivo local (normal en Cloud).");
         }
 
         const result = await connection.execute(
@@ -173,7 +172,8 @@ const generarCSV = async (req, res) => {
         let csvContent = 'ID;FECHA;RUTA;UNIDAD;CLIENTE;TIPO;VALOR\n';
         
         result.rows.forEach(row => {
-            csvContent += row.join(';') + '\n';
+            const valores = Object.values(row); 
+            csvContent += valores.join(';') + '\n';
         });
 
         res.header('Content-Type', 'text/csv');
