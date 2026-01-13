@@ -147,19 +147,38 @@ const generarCSV = async (req, res) => {
     let connection;
     try {
         connection = await database.openConnection();
+
+        try {
+            await connection.execute(`BEGIN EXPORTAR_CSV; END;`);
+            console.log("✅ Procedure PL/SQL ejecutado en Azure.");
+        } catch (plsqlError) {
+            console.warn("⚠️ Alerta PL/SQL:", plsqlError.message);
+        }
+
+        const result = await connection.execute(
+            `SELECT p.ID_PASAJE,
+                    TO_CHAR(p.FECHA_VIAJE, 'YYYY-MM-DD HH24:MI') AS FECHA,
+                    r.NOMBRE_RUTA,
+                    u.NUMERO_UNIDAD,
+                    p.NOMBRE_CLIENTE,
+                    t.NOMBRE_TIPO,
+                    TO_CHAR(p.VALOR_FINAL, '9990.00') AS VALOR
+             FROM PASAJES p
+             JOIN RUTAS r ON p.ID_RUTA = r.ID_RUTA
+             JOIN UNIDADES u ON p.ID_UNIDAD = u.ID_UNIDAD
+             JOIN TIPOS_PASAJE t ON p.ID_TIPO = t.ID_TIPO
+             ORDER BY p.ID_PASAJE ASC`
+        );
+
+        let csvContent = 'ID;FECHA;RUTA;UNIDAD;CLIENTE;TIPO;VALOR\n';
         
-        await connection.execute(`BEGIN EXPORTAR_CSV; END;`);
-
-        const archivoPath = 'C:\\reportes_transporte\\reporte_pasajes.csv';
-
-        res.download(archivoPath, 'reporte_ventas.csv', (err) => {
-            if (err) {
-                console.error("Error al enviar archivo:", err);
-                if (!res.headersSent) {
-                    res.status(500).send('Error al descargar el archivo.');
-                }
-            }
+        result.rows.forEach(row => {
+            csvContent += row.join(';') + '\n';
         });
+
+        res.header('Content-Type', 'text/csv');
+        res.attachment('reporte_ventas.csv');
+        res.send(csvContent);
 
     } catch (err) {
         console.error("Error generando CSV:", err);
